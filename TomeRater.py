@@ -1,7 +1,7 @@
 """
     TomeRater Capstone by Shawn A. Alleyne
     Started: 06/18/2018
-    Last Updated: 07/04/2018 Stopped [Get Creative] 10/11
+    Last Updated: 07/05/2018 Stopped [Get Creative] 11/11
 
     FUNCTIONS:
         fun_isblank
@@ -14,14 +14,14 @@
     CLASSES
         cls.User:
             Methods:       get_email,change_email,read_book,get_average_rating
-                           get_worth_of_collection
-            Construtors:   _int -> create, _repr -> print, _eq -> ==
+                           get_worth_of_collection,get_number_books()
+            Construtors:   _int -> create, _repr -> print, _eq -> == , _hash -> dict-key
 
           
         cls.Book:
             Methods:       get_title,get_isbn,set_isbn,add_rating,get_average_rating
                            get_price,set_price,add_review 
-            Construtors:   _int -> create , _repr -> print, _eq -> == , _hash -> ??
+            Construtors:   _int -> create , _repr -> print, _eq -> == , _hash -> dict-key
             
             cls.Fiction:
                 Methods:       get_author
@@ -35,7 +35,8 @@
             Methods:       create_book,create_novel,create_non_fiction,add_book_to_user,add_user
                            print_catalog,print_users,get_most_read_book,highest_rated_book,most_positive_user
                            modify_user_email,check_newisbn,store_isbn,remove_isbn,change_isbn
-                           get_worth_of_user,new_book_mailer
+                           get_worth_of_user,get_n_most_read_books(),get_n_most_prolific_readers()
+                           get_n_most_expensive_books()
             Construtors:   _int -> create, _repr -> print, _eq -> ==
 
 # List of all isbns seen this should be done by a database
@@ -266,8 +267,13 @@ class User(object):
           self.tot_book_cost += book.price
         if not fun_isblank(my_review):
               book.add_review(my_review)
+
               
-        
+    def get_number_books(self):
+      int_rtn_num_books = len(self.books)
+      return(int_rtn_num_books)
+    
+      
     def get_average_rating(self):
         int_tot_rating = 0
         int_avg_rating = 0
@@ -304,8 +310,12 @@ class User(object):
           self.tot_book_cost = rtn_flt_worth
         print(str_mess)         
         return(rtn_flt_worth)
-
       
+
+    def __hash__(self):
+      return hash((self.name, self.email))
+    
+    
     def __repr__(self):
         int_books = len(self.books)
         str_review = ""
@@ -326,10 +336,13 @@ class User(object):
 
 
     def __eq__(self, other_user):
-        rtn_equal = False
-        if self.name == other_user.name and self.email == other_user.email:
-            rtn_equal = True
-        return (rtn_equal)
+      rtn_equal = False
+      if self.name == other_user.name and self.email == other_user.email:
+        rtn_equal = True
+      return (rtn_equal)
+      
+
+    
 # END CLASS USER       
 
         
@@ -676,6 +689,110 @@ class TomeRater():
       else:
         print("Unable to find a user with email " + user_email + "\n Can not evaluate book collection value.") 
       return(rtn_flt_amount)
+
+
+    def get_n_most_read_books(self, prm_int_top_amt):
+        rtn_lst_books = []
+        lst_times_read = []
+        lst_times_read = list(self.books.values())
+        lst_times_read.sort()       #low-high
+        lst_times_read.reverse()    #high-low
+        int_max_books = len(lst_times_read)
+        bol_stop_count = False
+      
+        int_max_rtn = min(prm_int_top_amt,int_max_books)
+        if int_max_rtn >= 1:
+            int_add_elmnt = 0
+            dct_compare_books = self.books.copy()
+            for int_loop_count in range(0,int_max_rtn):
+                for book_cmp,book_read in dct_compare_books.items():
+                    if book_read == lst_times_read[int_loop_count]:
+                        int_add_elmnt += 1
+                        rtn_lst_books.append(book_cmp)
+                        dct_compare_books[book_cmp] = 0
+                        if int_add_elmnt == int_max_rtn:
+                            bol_stop_count = True
+                        if bol_stop_count == True:
+                          break
+                if bol_stop_count == True:
+                  break
+            if prm_int_top_amt > int_max_books:
+                print("There are only",int_max_books,"books can not return",prm_int_top_amt,"books.")
+        return(rtn_lst_books)
+    
+                
+    def get_n_most_prolific_readers(self, prm_int_top_readers):
+        dct_compare_readers = {}    #user_object:num_books_read
+        lst_num_books = []          #num_books_read
+        rtn_lst_readers = []
+        bol_stop_count = False
+        for reader in self.users.values():
+            if reader:
+                int_num_books = reader.get_number_books()
+                if int_num_books >= 1:
+                    dct_compare_readers[reader] = int_num_books
+                    lst_num_books.append(int_num_books)
+               
+        int_max_readers = len(dct_compare_readers)
+        lst_num_books.sort()
+        lst_num_books.reverse()
+        int_max_rtn = min(prm_int_top_readers,int_max_readers)
+        int_add_elmnt = 0
+        for int_loop_count in range(0,int_max_rtn):
+            for reader_cmp,books_bought in dct_compare_readers.items():
+                if books_bought == lst_num_books[int_loop_count]:
+                    int_add_elmnt += 1
+                    rtn_lst_readers.append(reader_cmp)
+                    dct_compare_readers[reader_cmp] = 0
+                    if int_add_elmnt == int_max_rtn:
+                        bol_stop_count = True
+                        if bol_stop_count == True:
+                            break
+            if bol_stop_count == True:
+                break
+
+        if prm_int_top_readers > int_max_readers:
+            print("There are only",int_max_readers,"users with book collections, can not return",prm_int_top_readers,"readers.")
+
+        return(rtn_lst_readers)
+
+
+    def get_n_most_expensive_books(self, prm_int_pricey_books):
+        dct_compare_books = {}      #book_object:price
+        lst_book_prices = []        #book_price
+        rtn_lst_books = []
+        bol_stop_count = False
+
+        for book in self.books:
+            if book:
+                flt_book_price = book.get_price()
+                if flt_book_price >= 0:
+                    dct_compare_books[book] = flt_book_price
+                    lst_book_prices.append(flt_book_price)
+                    
+        int_max_books = len(dct_compare_books)
+        lst_book_prices.sort()
+        lst_book_prices.reverse()
+        int_max_rtn = min(prm_int_pricey_books,int_max_books)
+        int_add_elmnt = 0
+        for int_loop_count in range(0,int_max_rtn):
+            for book_cmp,book_price in dct_compare_books.items():
+                if book_price == lst_book_prices[int_loop_count]:
+                    int_add_elmnt += 1
+                    rtn_lst_books.append(book_cmp)
+                    dct_compare_books[book_cmp] = 0
+                    if int_add_elmnt == int_max_rtn:
+                        bol_stop_count = True
+                        if bol_stop_count == True:
+                            break
+            if bol_stop_count == True:
+                break
+
+        if prm_int_pricey_books > int_max_books:
+            print("There are only",int_max_books,"users with book collections, can not return",prm_int_pricey_books,"books.")
+
+        return(rtn_lst_books)                   
+
       
     def __repr__(self):
       str_mess = "TomeRater has " + str(len(self.users)) + " readers and " + str(len(self.all_isbns)) + " unquie books."
