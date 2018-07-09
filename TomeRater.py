@@ -1,7 +1,7 @@
 """
     TomeRater Capstone by Shawn A. Alleyne
     Started: 06/18/2018
-    Last Updated: 07/05/2018 Stopped [Get Creative] 11/11
+    Last Updated: 07/08/2018 
 
     FUNCTIONS:
         fun_isblank
@@ -14,7 +14,7 @@
     CLASSES
         cls.User:
             Methods:       get_email,change_email,read_book,get_average_rating
-                           get_worth_of_collection,get_number_books()
+                           get_worth_of_collection,get_number_books,get_my_books
             Construtors:   _int -> create, _repr -> print, _eq -> == , _hash -> dict-key
 
           
@@ -35,13 +35,9 @@
             Methods:       create_book,create_novel,create_non_fiction,add_book_to_user,add_user
                            print_catalog,print_users,get_most_read_book,highest_rated_book,most_positive_user
                            modify_user_email,check_newisbn,store_isbn,remove_isbn,change_isbn
-                           get_worth_of_user,get_n_most_read_books(),get_n_most_prolific_readers()
-                           get_n_most_expensive_books()
+                           get_worth_of_user,get_n_most_read_books,get_n_most_prolific_readers
+                           get_n_most_expensive_books,sendmailer,new_book_mailer,recommnd_books
             Construtors:   _int -> create, _repr -> print, _eq -> ==
-
-# List of all isbns seen this should be done by a database
-# May have to up to a dict or class
-# isbn: [title,num_read,avr_rating,etc]
 
 """
 
@@ -272,7 +268,13 @@ class User(object):
     def get_number_books(self):
       int_rtn_num_books = len(self.books)
       return(int_rtn_num_books)
+
     
+    def get_my_books(self):
+        rtn_lst_my_books = []
+        rtn_lst_my_books = list(self.books.keys())
+        return(rtn_lst_my_books)
+      
       
     def get_average_rating(self):
         int_tot_rating = 0
@@ -412,7 +414,7 @@ class Book(object):
       if not fun_isblank(new_review):
         self.reviews.append(new_review)
 
-      
+    
     def __init__(self, title, isbn,my_genre = "",my_book_price=0.00):
         self.title = title
         self.isbn  = isbn
@@ -503,9 +505,12 @@ class TomeRater():
     def create_book(self,title,isbn,genre = "",book_price=0):
         bol_newisbn = False
         bol_newisbn = self.check_newisbn(isbn)
+        
         if bol_newisbn == True:
           rtn_obj_new_book = Book(title,isbn,genre,book_price)
           self.store_isbn(isbn)
+          if rtn_obj_new_book and len(self.users) > 3:
+            self.new_book_mailer(rtn_obj_new_book)
           return(rtn_obj_new_book)
         else:
           print("Can not create this book isbn is not unique.")
@@ -517,6 +522,8 @@ class TomeRater():
         if bol_newisbn == True:
           rtn_obj_new_book = Fiction(title,author,isbn,genre,book_price)
           self.store_isbn(isbn)
+          if rtn_obj_new_book and len(self.users) > 3:
+            self.new_book_mailer(rtn_obj_new_book)            
           return(rtn_obj_new_book)
         else:
           print("Can not create this novel isbn is not unique.")  
@@ -528,6 +535,8 @@ class TomeRater():
         if bol_newisbn == True:
           rtn_obj_new_book = Non_Fiction(title,subject,level,isbn,genre,book_price)
           self.store_isbn(isbn)
+          if rtn_obj_new_book and len(self.users) > 3:
+            self.new_book_mailer(rtn_obj_new_book)
           return(rtn_obj_new_book)
         else:
           print("Can not create this manual isbn is not unique.")
@@ -792,6 +801,191 @@ class TomeRater():
             print("There are only",int_max_books,"users with book collections, can not return",prm_int_pricey_books,"books.")
 
         return(rtn_lst_books)                   
+
+
+    def sendmailer(self, prm_str_event, prm_str_reason ,prm_user_obj,prm_lst_of_books):        
+        flt_discount = 0
+        str_emailheader = ""
+        str_emailsubject = ""
+        str_emailbody = "" 
+        flt_reg_price = 0
+        flt_dis_price = 0
+        book_obj = None
+        
+        if type(prm_lst_of_books) == list:
+          int_num_books = len(prm_lst_of_books)
+        else:
+          int_num_books = 1
+          
+        if not fun_isblank(prm_str_event) and prm_user_obj and int_num_books  > 0:
+            
+            str_emailheader = "From: TomeRator Book Club \n" + "To: " + prm_user_obj.get_email() 
+            str_emailbody = "     Hello " + prm_user_obj.name + ", \n"
+            
+            if prm_str_event == "New Book":
+                str_emailsubject = "Subject: !! New Book Added !! "
+                try:
+                    
+                    if int_num_books > 1:
+                      book_obj = prm_lst_of_books[0]
+                    else:
+                      book_obj = prm_lst_of_books
+                      
+                    if fun_isblank(prm_str_reason):
+                        prm_str_reason = "General"
+
+                    if prm_str_reason == "General":
+                        flt_discount = 0.05 #5%
+                    elif prm_str_reason == "Author":
+                        flt_discount = 0.08 #8%
+                    elif prm_str_reason == "Genre":
+                        flt_discount = 0.10 #10%
+                    str_emailbody += "       We wanted to let you know we just got a new book " + book_obj.title
+                    if hasattr(book_obj,"author"):
+                        str_emailbody += " by author " + book_obj.author
+                    if not fun_isblank(book_obj.genre):
+                        str_emailbody += " under the genre of " + book_obj.genre + ". \n"
+                    flt_reg_price = book_obj.price
+                    if flt_discount > 0:
+                       flt_dis_price = flt_reg_price * (1 - flt_discount)
+
+                    if flt_dis_price > 0:
+                       str_emailbody += "      Being a club member allows you to get this book in the next month not for ${:0.2F}".format(flt_reg_price) + " but at the discounted price of ${:0.2F}".format(flt_dis_price)
+                    else:
+                       str_emailbody += "This book is available to you at the great price of ${:0.2F}".format(flt_reg_price)
+                       
+                    str_emailbody += "\n \n \n     Thank you for being a reader with us. \n"
+                    
+                    print("-"*40)
+                    print(str_emailheader)
+                    print(str_emailsubject)
+                    print("-"*40)
+                    print(str_emailbody)
+                    print("=-"*50,"\n")
+                    
+                except ValueError:
+                  pass
+                except TypeError:
+                   pass
+                
+                
+            elif prm_str_event == "Recommend":
+                str_emailsubject = "Subject: Book Recommendation(s)"
+                
+                if fun_isblank(prm_str_reason):
+                    prm_str_reason = "General"                    
+
+                if prm_str_reason == "General" :
+                    flt_discount = 0.05 #5%
+                    str_emailbody += "       We found a few recommendations of books based on you preferences \n"
+                    
+                elif prm_str_reason == "FirstOfMonth":
+                    flt_discount = 0.08 #8%
+                    str_emailbody += "       It is the first of the month and we have few recommendations of books based on you preferences \n"
+                elif prm_str_reason == "Clearance-1":
+                    flt_discount = 0.20 #20%
+                    str_emailbody += "       We are having a 20% off clearance we have few recommendations of books you may want to consider \n"
+                elif prm_str_reason == "Clearance-2":
+                    flt_discount = 0.30 #30%
+                    str_emailbody += "       We are having a 30% off clearance we have few recommendations of books you may want to consider \n"
+                elif prm_str_reason == "MustGo":
+                    flt_discount = 0.50 #50%
+                    str_emailbody += "       We wanted you to know that we are have a must go clearance with up to 50% off. Don't miss out this is your chance to get \n"                    
+                for int_loop in range(0,int_num_books):
+                    try:
+                        if int_num_books > 1:
+                          book_obj = prm_lst_of_books[int_loop]
+                        else:
+                          book_obj = prm_lst_of_books[0]
+                      
+                        str_emailbody += "     " + book_obj.title
+                        flt_reg_price = book_obj.price
+                        
+                        if hasattr(book_obj,"author"):
+                            str_emailbody += " by author " + book_obj.author
+                            
+                        if not fun_isblank(book_obj.genre):
+                            str_emailbody += " under the genre of " + book_obj.genre                                       
+                        
+                        if flt_discount > 0:
+                           flt_dis_price = flt_reg_price * (1 - flt_discount)
+
+                        if flt_dis_price > 0:
+                           str_emailbody += " regular price  ${:0.2F}".format(flt_reg_price) + " discount to ${:0.2F}".format(flt_dis_price) + "\n"
+                        else:
+                           str_emailbody += " for the great price of  ${:0.2F}".format(flt_reg_price) + "\n"
+
+                        str_emailbody += "\n \n \n     Thank you for being a reader with us. \n"
+
+                        print("-"*40)
+                        print(str_emailheader)
+                        print(str_emailsubject)
+                        print("-"*40)
+                        print(str_emailbody)
+                        print("=-"*50,"\n")                    
+                    
+                    except ValueError:
+                        pass
+                    except TypeError:
+                       pass       
+        else:
+            print("All the infomation needed to send mailers is not present.")
+
+
+    def new_book_mailer(self,prm_book_obj):        
+        str_book_author = ""
+        str_book_genre = ""
+        lst_used_users = []
+        if prm_book_obj:
+            str_book_genre = prm_book_obj.genre
+            if hasattr(prm_book_obj,"author"):
+              str_book_author =  prm_book_obj.author
+              if not fun_isblank(str_book_author):
+                for curr_user in self.users.values():
+                    if not fun_isblank(curr_user.fav_author) and ( curr_user.fav_author == str_book_author or curr_user.fav_author.find(str_book_author) >=0):
+                        self.sendmailer("New Book", "Author" ,curr_user,prm_book_obj)
+                        lst_used_users.append(curr_user)
+                    
+            if not fun_isblank(str_book_genre):
+                for curr_user in self.users.values():
+                    if lst_used_users.count(curr_user) == 0:
+                        self.sendmailer("New Book", "Genre" ,curr_user,prm_book_obj)
+                        lst_used_users.append(curr_user)
+              
+            for curr_user in self.users.values():
+                if lst_used_users.count(curr_user) == 0:
+                  self.sendmailer("New Book", "" ,curr_user,prm_book_obj)
+                  
+                        
+    def recommnd_books(self,prm_str_event):
+        for curr_user in self.users.values():
+            int_rmmnd_count = 0
+            lst_rmmnd_books = []
+            lst_of_collection = []
+            if not fun_isblank(curr_user.fav_genre) or not fun_isblank(curr_user.fav_author):
+                lst_of_collection = curr_user.get_my_books()
+                int_num_books = len(lst_of_collection)
+                for chk_book in self.books.keys():
+                    if int_num_books > 1 and lst_of_collection.count(chk_book) > 0:
+                        pass
+                    else:
+                        # Assumes one genre per book
+                        if chk_book.genre.upper() in curr_user.fav_genre.upper():
+                            int_rmmnd_count +=1
+                            lst_rmmnd_books.append(chk_book)
+                        else:
+                            # Assumes one author per book
+                            if hasattr(chk_book,"author"):
+                                if chk_book.author.upper() in curr_user.fav_author.upper():
+                                    int_rmmnd_count +=1
+                                    lst_rmmnd_books.append(chk_book)
+                                                                
+                        if int_rmmnd_count == 5:
+                            break
+                        
+                if int_rmmnd_count > 0:
+                    #print("!!!! TESTING recommnd_books ",prm_str_event,"count",int_rmmnd_count,"User ", curr_user,lst_rmmnd_books,"   !!!")
+                    self.sendmailer("Recommend", prm_str_event,curr_user,lst_rmmnd_books)
 
       
     def __repr__(self):
